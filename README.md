@@ -21,8 +21,8 @@ cd flight-data-api-feed
 # Start PostgreSQL + app
 docker-compose up -d
 
-# App is running at http://localhost:3000
-# Admin panel: http://localhost:3000/admin/
+# App is running at http://localhost:3001
+# Admin panel: http://localhost:3001/admin/
 # Login: admin / admin123
 ```
 
@@ -131,23 +131,23 @@ See [API_DOCS.md](API_DOCS.md) or the built-in docs at `/admin/docs.html`.
 
 ```bash
 # List today's flights
-curl -H "x-api-key: YOUR_KEY" http://localhost:3000/api/v1/flights?date=2026-03-04
+curl -H "x-api-key: YOUR_KEY" http://localhost:3001/api/v1/flights?date=2026-03-04
 
 # Get flight by ID
-curl -H "x-api-key: YOUR_KEY" http://localhost:3000/api/v1/flights/1
+curl -H "x-api-key: YOUR_KEY" http://localhost:3001/api/v1/flights/1
 
 # Get available dates
-curl -H "x-api-key: YOUR_KEY" http://localhost:3000/api/v1/dates
+curl -H "x-api-key: YOUR_KEY" http://localhost:3001/api/v1/dates
 
 # Get stats
-curl -H "x-api-key: YOUR_KEY" http://localhost:3000/api/v1/stats
+curl -H "x-api-key: YOUR_KEY" http://localhost:3001/api/v1/stats
 ```
 
 ## Environment Variables
 
 | Variable          | Default                                          | Description                    |
 |-------------------|--------------------------------------------------|--------------------------------|
-| `PORT`            | `3000`                                           | Server port                    |
+| `PORT`            | `3001`                                           | Server port                    |
 | `DATABASE_URL`    | `postgresql://flightdata:flightdata@localhost:5432/flightdata` | PostgreSQL connection string |
 | `DB_SSL`          | `false`                                          | Enable SSL for DB connection   |
 | `TRUST_PROXY`     | `false`                                          | Trust reverse proxy headers    |

@@ -1,0 +1,45 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: flightdata
+      POSTGRES_PASSWORD: flightdata
+      POSTGRES_DB: flightdata
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flightdata"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "3000:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      DATABASE_URL: postgresql://flightdata:flightdata@db:5432/flightdata
+      ADMIN_USERNAME: admin
+      ADMIN_PASSWORD: admin123
+      SESSION_SECRET: change-me-to-a-random-string
+      FLIGHTS_PER_DAY: 36
+      GENERATE_HOUR: 0
+      GENERATE_MINUTE: 5
+    command: >
+      sh -c "npx knex migrate:latest --knexfile knexfile.js &&
+             npx knex seed:run --knexfile knexfile.js &&
+             node src/index.js"
+
+volumes:
+  pgdata:

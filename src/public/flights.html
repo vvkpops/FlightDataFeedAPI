@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Flights — Flight Data Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/admin.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="brand"><i class="bi bi-airplane-engines"></i> Flight Data</div>
+  <ul class="nav flex-column mt-2">
+    <li class="nav-item"><a class="nav-link" href="/admin/"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+    <li class="nav-item"><a class="nav-link active" href="/admin/flights.html"><i class="bi bi-table"></i> Flights</a></li>
+    <li class="nav-item"><a class="nav-link" href="/admin/api-keys.html"><i class="bi bi-key"></i> API Keys</a></li>
+    <li class="nav-item"><a class="nav-link" href="/admin/docs.html"><i class="bi bi-book"></i> API Docs</a></li>
+    <li class="nav-item mt-4"><a class="nav-link text-danger" href="#" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+  </ul>
+</nav>
+
+<!-- Main -->
+<div class="main-content">
+  <h4 class="mb-4">Flight Data</h4>
+
+  <!-- Filters -->
+  <div class="card mb-3">
+    <div class="card-body">
+      <form id="filterForm" class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="form-label small">Date</label>
+          <input type="date" class="form-control form-control-sm" id="fDate">
+        </div>
+        <div class="col-auto">
+          <label class="form-label small">Callsign</label>
+          <input type="text" class="form-control form-control-sm" id="fCallsign" placeholder="PVL910" style="width:100px">
+        </div>
+        <div class="col-auto">
+          <label class="form-label small">Departure</label>
+          <input type="text" class="form-control form-control-sm" id="fDep" placeholder="CYUL" style="width:80px">
+        </div>
+        <div class="col-auto">
+          <label class="form-label small">Arrival</label>
+          <input type="text" class="form-control form-control-sm" id="fArr" placeholder="CYQB" style="width:80px">
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-search"></i> Filter</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="clearBtn">Clear</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Table -->
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead><tr>
+          <th>ID</th><th>Callsign</th><th>Type</th><th>Reg</th>
+          <th>Dep</th><th>Arr</th><th>Alt</th>
+          <th>Dep Time</th><th>Arr Time</th><th>ETA</th><th>Alt ETA</th>
+          <th>Date</th><th></th>
+        </tr></thead>
+        <tbody id="flightsTable"></tbody>
+      </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+      <span class="small text-muted" id="pageInfo"></span>
+      <div>
+        <button class="btn btn-sm btn-outline-primary" id="prevBtn" disabled>&laquo; Prev</button>
+        <button class="btn btn-sm btn-outline-primary" id="nextBtn" disabled>Next &raquo;</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Modal -->
+<div class="modal fade" id="editModal" tabindex="-1">
+  <div class="modal-dialog modal-lg">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Edit Flight</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="editForm">
+        <div class="modal-body">
+          <input type="hidden" id="editId">
+          <div class="row g-3">
+            <div class="col-md-4">
+              <label class="form-label">Callsign</label>
+              <input type="text" class="form-control" id="editCallsign" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Aircraft Type</label>
+              <input type="text" class="form-control" id="editActype" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Registration</label>
+              <input type="text" class="form-control" id="editReg" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Departure ICAO</label>
+              <input type="text" class="form-control" id="editDep" maxlength="4" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Arrival ICAO</label>
+              <input type="text" class="form-control" id="editArr" maxlength="4" required>
+            </div>
+            <div class="col-md-4">
+              <label class="form-label">Alternate ICAO</label>
+              <input type="text" class="form-control" id="editAlt" maxlength="4">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Departure Time (UTC)</label>
+              <input type="datetime-local" class="form-control" id="editDepTime" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Arrival Time (UTC)</label>
+              <input type="datetime-local" class="form-control" id="editArrTime" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">ETA (UTC)</label>
+              <input type="datetime-local" class="form-control" id="editEta">
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Alternate ETA (UTC)</label>
+              <input type="datetime-local" class="form-control" id="editAltEta">
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Save Changes</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/admin/js/common.js"></script>
+<script>
+  checkAuth();
+
+  let currentPage = 1;
+  const limit = 50;
+
+  function toLocalInput(iso) {
+    if (!iso) return '';
+    return new Date(iso).toISOString().slice(0, 16);
+  }
+
+  async function loadFlights() {
+    const params = new URLSearchParams();
+    const date = document.getElementById('fDate').value;
+    const callsign = document.getElementById('fCallsign').value.trim();
+    const dep = document.getElementById('fDep').value.trim();
+    const arr = document.getElementById('fArr').value.trim();
+    if (date) params.set('date', date);
+    if (callsign) params.set('callsign', callsign);
+    if (dep) params.set('departure', dep);
+    if (arr) params.set('arrival', arr);
+    params.set('page', currentPage);
+    params.set('limit', limit);
+
+    const res = await apiFetch(`/flights?${params}`);
+    const { data, pagination } = await res.json();
+
+    const tbody = document.getElementById('flightsTable');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="13" class="text-center text-muted py-4">No flights found</td></tr>';
+    } else {
+      tbody.innerHTML = data.map(f => `
+        <tr>
+          <td>${f.id}</td>
+          <td><strong>${f.callsign}</strong></td>
+          <td>${f.actype}</td>
+          <td>${f.acregistration}</td>
+          <td>${f.departureicao}</td>
+          <td>${f.arrivalicao}</td>
+          <td>${f.alternateicao || ''}</td>
+          <td class="small">${formatDateTime(f.departuretime)}</td>
+          <td class="small">${formatDateTime(f.arrivaltime)}</td>
+          <td class="small">${formatDateTime(f.eta)}</td>
+          <td class="small">${formatDateTime(f.alteta)}</td>
+          <td>${formatDate(f.generation_date)}</td>
+          <td>
+            <button class="btn btn-sm btn-outline-primary edit-btn" data-id="${f.id}"><i class="bi bi-pencil"></i></button>
+            <button class="btn btn-sm btn-outline-danger del-btn" data-id="${f.id}"><i class="bi bi-trash"></i></button>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    document.getElementById('pageInfo').textContent =
+      `Page ${pagination.page} of ${pagination.pages} (${pagination.total} flights)`;
+    document.getElementById('prevBtn').disabled = pagination.page <= 1;
+    document.getElementById('nextBtn').disabled = pagination.page >= pagination.pages;
+  }
+
+  loadFlights();
+
+  document.getElementById('filterForm').addEventListener('submit', (e) => {
+    e.preventDefault();
+    currentPage = 1;
+    loadFlights();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', () => {
+    document.getElementById('fDate').value = '';
+    document.getElementById('fCallsign').value = '';
+    document.getElementById('fDep').value = '';
+    document.getElementById('fArr').value = '';
+    currentPage = 1;
+    loadFlights();
+  });
+
+  document.getElementById('prevBtn').addEventListener('click', () => { currentPage--; loadFlights(); });
+  document.getElementById('nextBtn').addEventListener('click', () => { currentPage++; loadFlights(); });
+
+  // Edit
+  document.getElementById('flightsTable').addEventListener('click', async (e) => {
+    const editBtn = e.target.closest('.edit-btn');
+    const delBtn = e.target.closest('.del-btn');
+
+    if (editBtn) {
+      const id = editBtn.dataset.id;
+      const res = await apiFetch(`/flights/${id}`);
+      const { data: f } = await res.json();
+      document.getElementById('editId').value = f.id;
+      document.getElementById('editCallsign').value = f.callsign;
+      document.getElementById('editActype').value = f.actype;
+      document.getElementById('editReg').value = f.acregistration;
+      document.getElementById('editDep').value = f.departureicao;
+      document.getElementById('editArr').value = f.arrivalicao;
+      document.getElementById('editAlt').value = f.alternateicao || '';
+      document.getElementById('editDepTime').value = toLocalInput(f.departuretime);
+      document.getElementById('editArrTime').value = toLocalInput(f.arrivaltime);
+      document.getElementById('editEta').value = toLocalInput(f.eta);
+      document.getElementById('editAltEta').value = toLocalInput(f.alteta);
+      new bootstrap.Modal(document.getElementById('editModal')).show();
+    }
+
+    if (delBtn) {
+      if (!confirm('Delete this flight?')) return;
+      const id = delBtn.dataset.id;
+      await apiFetch(`/flights/${id}`, { method: 'DELETE' });
+      showToast('Flight deleted');
+      loadFlights();
+    }
+  });
+
+  document.getElementById('editForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const id = document.getElementById('editId').value;
+    const body = {
+      callsign: document.getElementById('editCallsign').value.toUpperCase(),
+      actype: document.getElementById('editActype').value.toUpperCase(),
+      acregistration: document.getElementById('editReg').value.toUpperCase(),
+      departureicao: document.getElementById('editDep').value.toUpperCase(),
+      arrivalicao: document.getElementById('editArr').value.toUpperCase(),
+      alternateicao: document.getElementById('editAlt').value.toUpperCase() || null,
+      departuretime: new Date(document.getElementById('editDepTime').value).toISOString(),
+      arrivaltime: new Date(document.getElementById('editArrTime').value).toISOString(),
+      eta: document.getElementById('editEta').value ? new Date(document.getElementById('editEta').value).toISOString() : null,
+      alteta: document.getElementById('editAltEta').value ? new Date(document.getElementById('editAltEta').value).toISOString() : null,
+    };
+    await apiFetch(`/flights/${id}`, { method: 'PUT', body: JSON.stringify(body) });
+    bootstrap.Modal.getInstance(document.getElementById('editModal')).hide();
+    showToast('Flight updated');
+    loadFlights();
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await apiFetch('/logout', { method: 'POST' });
+    window.location.href = '/admin/login';
+  });
+</script>
+</body>
+</html>

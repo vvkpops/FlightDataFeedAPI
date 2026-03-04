@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard — Flight Data Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/admin.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="brand"><i class="bi bi-airplane-engines"></i> Flight Data</div>
+  <ul class="nav flex-column mt-2">
+    <li class="nav-item"><a class="nav-link active" href="/admin/"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+    <li class="nav-item"><a class="nav-link" href="/admin/flights.html"><i class="bi bi-table"></i> Flights</a></li>
+    <li class="nav-item"><a class="nav-link" href="/admin/api-keys.html"><i class="bi bi-key"></i> API Keys</a></li>
+    <li class="nav-item"><a class="nav-link" href="/admin/docs.html"><i class="bi bi-book"></i> API Docs</a></li>
+    <li class="nav-item mt-4"><a class="nav-link text-danger" href="#" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+  </ul>
+</nav>
+
+<!-- Main -->
+<div class="main-content">
+  <h4 class="mb-4">Dashboard</h4>
+
+  <!-- Stats row -->
+  <div class="row g-3 mb-4">
+    <div class="col-md-3">
+      <div class="card stat-card p-3">
+        <div class="stat-value" id="statFlights">—</div>
+        <div class="stat-label">Total Flights</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card p-3">
+        <div class="stat-value" id="statDays">—</div>
+        <div class="stat-label">Days Generated</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card p-3">
+        <div class="stat-value" id="statKeys">—</div>
+        <div class="stat-label">Active API Keys</div>
+      </div>
+    </div>
+    <div class="col-md-3">
+      <div class="card stat-card p-3">
+        <div class="stat-value" id="statLatest">—</div>
+        <div class="stat-label">Latest Generation</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quick generate -->
+  <div class="card mb-4">
+    <div class="card-body">
+      <h6 class="card-title">Generate Flight Data</h6>
+      <form id="generateForm" class="row g-2 align-items-end">
+        <div class="col-auto">
+          <label class="form-label small">Date</label>
+          <input type="date" class="form-control form-control-sm" id="genDate">
+        </div>
+        <div class="col-auto">
+          <label class="form-label small">Flights</label>
+          <input type="number" class="form-control form-control-sm" id="genCount" value="36" min="1" max="200" style="width:80px">
+        </div>
+        <div class="col-auto">
+          <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-play-fill"></i> Generate</button>
+        </div>
+        <div class="col-auto" id="genResult"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Recent flights -->
+  <div class="card">
+    <div class="card-header d-flex justify-content-between align-items-center">
+      <span>Recent Flights</span>
+      <a href="/admin/flights.html" class="btn btn-sm btn-outline-primary">View All</a>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead><tr>
+          <th>Callsign</th><th>Type</th><th>Reg</th><th>From</th><th>To</th><th>Dep Time</th><th>ETA</th><th>Date</th>
+        </tr></thead>
+        <tbody id="recentFlights"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="/admin/js/common.js"></script>
+<script>
+  checkAuth();
+
+  // Set default date to today
+  document.getElementById('genDate').value = new Date().toISOString().slice(0, 10);
+
+  async function loadDashboard() {
+    const res = await apiFetch('/dashboard');
+    const d = await res.json();
+
+    document.getElementById('statFlights').textContent = d.total_flights.toLocaleString();
+    document.getElementById('statDays').textContent = d.total_days;
+    document.getElementById('statKeys').textContent = d.active_keys;
+    document.getElementById('statLatest').textContent = d.latest_generation
+      ? formatDate(d.latest_generation.generation_date)
+      : 'None';
+
+    const tbody = document.getElementById('recentFlights');
+    tbody.innerHTML = d.recent_flights.map(f => `
+      <tr>
+        <td><strong>${f.callsign}</strong></td>
+        <td>${f.actype}</td>
+        <td>${f.acregistration}</td>
+        <td>${f.departureicao}</td>
+        <td>${f.arrivalicao}</td>
+        <td>${formatDateTime(f.departuretime)}</td>
+        <td>${formatDateTime(f.eta)}</td>
+        <td>${formatDate(f.generation_date)}</td>
+      </tr>
+    `).join('');
+  }
+
+  loadDashboard();
+
+  document.getElementById('generateForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const date = document.getElementById('genDate').value;
+    const count = document.getElementById('genCount').value;
+    const resultEl = document.getElementById('genResult');
+    resultEl.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+
+    const res = await apiFetch('/generate', {
+      method: 'POST',
+      body: JSON.stringify({ date, count: parseInt(count) }),
+    });
+    const data = await res.json();
+    if (data.skipped) {
+      resultEl.innerHTML = '<span class="text-warning small">Already generated for this date</span>';
+    } else {
+      resultEl.innerHTML = `<span class="text-success small">Generated ${data.inserted} flights</span>`;
+      loadDashboard();
+    }
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await apiFetch('/logout', { method: 'POST' });
+    window.location.href = '/admin/login';
+  });
+</script>
+</body>
+</html>

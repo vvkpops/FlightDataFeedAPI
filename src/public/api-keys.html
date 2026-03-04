@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API Keys — Flight Data Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/admin.css" rel="stylesheet">
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="brand"><i class="bi bi-airplane-engines"></i> Flight Data</div>
+  <ul class="nav flex-column mt-2">
+    <li class="nav-item"><a class="nav-link" href="/admin/"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+    <li class="nav-item"><a class="nav-link" href="/admin/flights.html"><i class="bi bi-table"></i> Flights</a></li>
+    <li class="nav-item"><a class="nav-link active" href="/admin/api-keys.html"><i class="bi bi-key"></i> API Keys</a></li>
+    <li class="nav-item"><a class="nav-link" href="/admin/docs.html"><i class="bi bi-book"></i> API Docs</a></li>
+    <li class="nav-item mt-4"><a class="nav-link text-danger" href="#" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+  </ul>
+</nav>
+
+<!-- Main -->
+<div class="main-content">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="mb-0">API Keys</h4>
+    <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#createModal">
+      <i class="bi bi-plus-lg"></i> Create Key
+    </button>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm table-hover mb-0">
+        <thead><tr>
+          <th>Name</th><th>API Key</th><th>Status</th><th>Last Used</th><th>Created</th><th></th>
+        </tr></thead>
+        <tbody id="keysTable"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Create Modal -->
+<div class="modal fade" id="createModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title">Create API Key</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+      </div>
+      <form id="createForm">
+        <div class="modal-body">
+          <div class="mb-3">
+            <label class="form-label">Name / Description</label>
+            <input type="text" class="form-control" id="keyName" placeholder="e.g. Mobile App Production" required>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Create</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+
+<!-- Key Created Success Modal -->
+<div class="modal fade" id="keyCreatedModal" tabindex="-1">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header bg-success text-white">
+        <h5 class="modal-title">API Key Created</h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+      </div>
+      <div class="modal-body">
+        <p class="small text-muted">Copy this key now — it won't be shown in full again.</p>
+        <div class="input-group">
+          <input type="text" class="form-control font-monospace" id="newKeyValue" readonly>
+          <button class="btn btn-outline-secondary" type="button" id="copyKeyBtn"><i class="bi bi-clipboard"></i></button>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-success" data-bs-dismiss="modal">Done</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="/admin/js/common.js"></script>
+<script>
+  checkAuth();
+
+  async function loadKeys() {
+    const res = await apiFetch('/api-keys');
+    const { data } = await res.json();
+
+    const tbody = document.getElementById('keysTable');
+    if (!data.length) {
+      tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-4">No API keys yet</td></tr>';
+      return;
+    }
+
+    tbody.innerHTML = data.map(k => `
+      <tr>
+        <td><strong>${k.name}</strong></td>
+        <td><code class="small">${k.key.slice(0, 12)}...${k.key.slice(-6)}</code>
+            <button class="btn btn-sm btn-link p-0 ms-1 copy-full" data-key="${k.key}" title="Copy full key"><i class="bi bi-clipboard"></i></button>
+        </td>
+        <td>
+          <span class="badge ${k.is_active ? 'badge-active' : 'badge-inactive'}">
+            ${k.is_active ? 'Active' : 'Revoked'}
+          </span>
+        </td>
+        <td class="small">${k.last_used_at ? formatDateTime(k.last_used_at) : 'Never'}</td>
+        <td class="small">${formatDateTime(k.created_at)}</td>
+        <td>
+          ${k.is_active
+            ? `<button class="btn btn-sm btn-outline-warning toggle-btn" data-id="${k.id}" data-active="false"><i class="bi bi-pause-fill"></i> Revoke</button>`
+            : `<button class="btn btn-sm btn-outline-success toggle-btn" data-id="${k.id}" data-active="true"><i class="bi bi-play-fill"></i> Activate</button>`
+          }
+          <button class="btn btn-sm btn-outline-danger del-btn" data-id="${k.id}"><i class="bi bi-trash"></i></button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  loadKeys();
+
+  // Create key
+  document.getElementById('createForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const name = document.getElementById('keyName').value.trim();
+    const res = await apiFetch('/api-keys', { method: 'POST', body: JSON.stringify({ name }) });
+    const { data } = await res.json();
+
+    bootstrap.Modal.getInstance(document.getElementById('createModal')).hide();
+    document.getElementById('keyName').value = '';
+
+    document.getElementById('newKeyValue').value = data.key;
+    new bootstrap.Modal(document.getElementById('keyCreatedModal')).show();
+    loadKeys();
+  });
+
+  // Copy new key
+  document.getElementById('copyKeyBtn').addEventListener('click', () => {
+    const val = document.getElementById('newKeyValue').value;
+    navigator.clipboard.writeText(val);
+    showToast('Key copied to clipboard');
+  });
+
+  // Table actions
+  document.getElementById('keysTable').addEventListener('click', async (e) => {
+    const toggleBtn = e.target.closest('.toggle-btn');
+    const delBtn = e.target.closest('.del-btn');
+    const copyBtn = e.target.closest('.copy-full');
+
+    if (copyBtn) {
+      navigator.clipboard.writeText(copyBtn.dataset.key);
+      showToast('Key copied');
+    }
+
+    if (toggleBtn) {
+      const id = toggleBtn.dataset.id;
+      const is_active = toggleBtn.dataset.active === 'true';
+      await apiFetch(`/api-keys/${id}`, { method: 'PUT', body: JSON.stringify({ is_active }) });
+      showToast(is_active ? 'Key activated' : 'Key revoked');
+      loadKeys();
+    }
+
+    if (delBtn) {
+      if (!confirm('Permanently delete this API key?')) return;
+      await apiFetch(`/api-keys/${delBtn.dataset.id}`, { method: 'DELETE' });
+      showToast('Key deleted');
+      loadKeys();
+    }
+  });
+
+  document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await apiFetch('/logout', { method: 'POST' });
+    window.location.href = '/admin/login';
+  });
+</script>
+</body>
+</html>

@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>API Docs — Flight Data Admin</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+  <link href="/admin/css/admin.css" rel="stylesheet">
+  <style>
+    pre { background: #1b2838; color: #e6e6e6; padding: 1rem; border-radius: .5rem; overflow-x: auto; }
+    code { color: #c2c7d0; }
+    .endpoint { border-left: 3px solid #0d6efd; padding-left: 1rem; margin-bottom: 2rem; }
+    .method { font-weight: 700; font-size: .85rem; padding: .15rem .5rem; border-radius: .25rem; margin-right: .5rem; }
+    .method-get { background: #198754; color: #fff; }
+    .param-table th { font-size: .8rem; }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<nav class="sidebar">
+  <div class="brand"><i class="bi bi-airplane-engines"></i> Flight Data</div>
+  <ul class="nav flex-column mt-2">
+    <li class="nav-item"><a class="nav-link" href="/admin/"><i class="bi bi-speedometer2"></i> Dashboard</a></li>
+    <li class="nav-item"><a class="nav-link" href="/admin/flights.html"><i class="bi bi-table"></i> Flights</a></li>
+    <li class="nav-item"><a class="nav-link" href="/admin/api-keys.html"><i class="bi bi-key"></i> API Keys</a></li>
+    <li class="nav-item"><a class="nav-link active" href="/admin/docs.html"><i class="bi bi-book"></i> API Docs</a></li>
+    <li class="nav-item mt-4"><a class="nav-link text-danger" href="#" id="logoutBtn"><i class="bi bi-box-arrow-right"></i> Logout</a></li>
+  </ul>
+</nav>
+
+<!-- Main -->
+<div class="main-content" style="max-width: 900px;">
+  <h4 class="mb-4">API Documentation</h4>
+
+  <div class="alert alert-info small">
+    <strong>Base URL:</strong> <code id="baseUrl"></code><br>
+    All endpoints require the <code>x-api-key</code> header. Create keys in the <a href="/admin/api-keys.html">API Keys</a> page.
+  </div>
+
+  <h5 class="mb-3">Authentication</h5>
+  <p>Include your API key in every request header:</p>
+  <pre>x-api-key: fda_your_api_key_here</pre>
+
+  <hr class="my-4">
+
+  <!-- GET /api/v1/flights -->
+  <div class="endpoint">
+    <h6><span class="method method-get">GET</span> /api/v1/flights</h6>
+    <p class="text-muted small">Retrieve paginated flight data with optional filters.</p>
+    <table class="table table-sm param-table">
+      <thead><tr><th>Parameter</th><th>Type</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><code>date</code></td><td>string</td><td>Filter by generation date (YYYY-MM-DD)</td></tr>
+        <tr><td><code>from_date</code></td><td>string</td><td>Start date range (inclusive)</td></tr>
+        <tr><td><code>to_date</code></td><td>string</td><td>End date range (inclusive)</td></tr>
+        <tr><td><code>callsign</code></td><td>string</td><td>Exact callsign match (e.g. PVL910)</td></tr>
+        <tr><td><code>departure</code></td><td>string</td><td>Departure ICAO code (e.g. CYUL)</td></tr>
+        <tr><td><code>arrival</code></td><td>string</td><td>Arrival ICAO code</td></tr>
+        <tr><td><code>registration</code></td><td>string</td><td>Aircraft registration (e.g. C-GMXE)</td></tr>
+        <tr><td><code>page</code></td><td>number</td><td>Page number (default: 1)</td></tr>
+        <tr><td><code>limit</code></td><td>number</td><td>Results per page (default: 50, max: 200)</td></tr>
+      </tbody>
+    </table>
+    <p class="small"><strong>Example:</strong></p>
+    <pre>curl -H "x-api-key: YOUR_KEY" \
+  "https://your-host/api/v1/flights?date=2026-03-04&departure=CYUL&limit=10"</pre>
+    <p class="small"><strong>Response:</strong></p>
+    <pre>{
+  "data": [
+    {
+      "id": 1,
+      "callsign": "PVL910",
+      "actype": "B77E",
+      "acregistration": "C-GMXE",
+      "departureicao": "CYUL",
+      "arrivalicao": "CYQB",
+      "alternateicao": "CYMX",
+      "departuretime": "2026-03-04T08:15:00.000Z",
+      "arrivaltime": "2026-03-04T09:45:00.000Z",
+      "eta": "2026-03-04T09:52:00.000Z",
+      "alteta": "2026-03-04T09:52:00.000Z",
+      "generation_date": "2026-03-04"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "limit": 10,
+    "total": 36,
+    "pages": 4
+  }
+}</pre>
+  </div>
+
+  <!-- GET /api/v1/flights/:id -->
+  <div class="endpoint">
+    <h6><span class="method method-get">GET</span> /api/v1/flights/:id</h6>
+    <p class="text-muted small">Retrieve a single flight by ID.</p>
+    <pre>curl -H "x-api-key: YOUR_KEY" "https://your-host/api/v1/flights/42"</pre>
+    <pre>{
+  "data": {
+    "id": 42,
+    "callsign": "PVL847",
+    ...
+  }
+}</pre>
+  </div>
+
+  <!-- GET /api/v1/dates -->
+  <div class="endpoint">
+    <h6><span class="method method-get">GET</span> /api/v1/dates</h6>
+    <p class="text-muted small">List all generation dates and flight counts.</p>
+    <pre>curl -H "x-api-key: YOUR_KEY" "https://your-host/api/v1/dates"</pre>
+    <pre>{
+  "data": [
+    { "generation_date": "2026-03-05", "flights_count": 36, "created_at": "..." },
+    { "generation_date": "2026-03-04", "flights_count": 36, "created_at": "..." }
+  ]
+}</pre>
+  </div>
+
+  <!-- GET /api/v1/stats -->
+  <div class="endpoint">
+    <h6><span class="method method-get">GET</span> /api/v1/stats</h6>
+    <p class="text-muted small">Get summary statistics.</p>
+    <pre>curl -H "x-api-key: YOUR_KEY" "https://your-host/api/v1/stats"</pre>
+    <pre>{
+  "data": {
+    "total_flights": 180,
+    "total_days": 5,
+    "latest_generation_date": "2026-03-05"
+  }
+}</pre>
+  </div>
+
+  <hr class="my-4">
+
+  <h5 class="mb-3">Error Responses</h5>
+  <table class="table table-sm">
+    <thead><tr><th>Status</th><th>Meaning</th></tr></thead>
+    <tbody>
+      <tr><td><code>401</code></td><td>Missing <code>x-api-key</code> header</td></tr>
+      <tr><td><code>403</code></td><td>Invalid or revoked API key</td></tr>
+      <tr><td><code>404</code></td><td>Resource not found</td></tr>
+      <tr><td><code>500</code></td><td>Internal server error</td></tr>
+    </tbody>
+  </table>
+
+  <h5 class="mb-3">Rate Limits</h5>
+  <p class="text-muted small">No rate limits are enforced by default. Add rate limiting middleware if deploying publicly.</p>
+
+  <h5 class="mb-3">Data Schema</h5>
+  <table class="table table-sm">
+    <thead><tr><th>Field</th><th>Type</th><th>Description</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td>integer</td><td>Auto-increment primary key</td></tr>
+      <tr><td><code>callsign</code></td><td>string</td><td>Flight callsign (e.g. PVL910)</td></tr>
+      <tr><td><code>actype</code></td><td>string</td><td>ICAO aircraft type designator</td></tr>
+      <tr><td><code>acregistration</code></td><td>string</td><td>Aircraft registration (e.g. C-GMXE)</td></tr>
+      <tr><td><code>departureicao</code></td><td>string</td><td>Departure airport ICAO code</td></tr>
+      <tr><td><code>arrivalicao</code></td><td>string</td><td>Arrival airport ICAO code</td></tr>
+      <tr><td><code>alternateicao</code></td><td>string</td><td>Alternate airport ICAO code</td></tr>
+      <tr><td><code>departuretime</code></td><td>ISO 8601</td><td>Scheduled departure time (UTC)</td></tr>
+      <tr><td><code>arrivaltime</code></td><td>ISO 8601</td><td>Scheduled arrival time (UTC)</td></tr>
+      <tr><td><code>eta</code></td><td>ISO 8601</td><td>Estimated time of arrival (UTC)</td></tr>
+      <tr><td><code>alteta</code></td><td>ISO 8601</td><td>ETA to alternate airport (UTC)</td></tr>
+      <tr><td><code>generation_date</code></td><td>date</td><td>Date this record was generated for</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<script src="/admin/js/common.js"></script>
+<script>
+  checkAuth();
+  document.getElementById('baseUrl').textContent = window.location.origin;
+  document.getElementById('logoutBtn').addEventListener('click', async (e) => {
+    e.preventDefault();
+    await apiFetch('/logout', { method: 'POST' });
+    window.location.href = '/admin/login';
+  });
+</script>
+</body>
+</html>

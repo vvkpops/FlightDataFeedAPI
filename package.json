@@ -1,0 +1,37 @@
+{
+  "name": "flight-data-api-feed",
+  "version": "1.0.0",
+  "description": "Flight Data API Feed — generates daily flight data, serves via REST API, stores in PostgreSQL",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "nodemon src/index.js",
+    "migrate": "knex migrate:latest --knexfile knexfile.js",
+    "migrate:rollback": "knex migrate:rollback --knexfile knexfile.js",
+    "seed": "knex seed:run --knexfile knexfile.js",
+    "generate": "node src/scripts/generateToday.js",
+    "docker:up": "docker-compose up -d",
+    "docker:down": "docker-compose down"
+  },
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cookie-parser": "^1.4.6",
+    "cors": "^2.8.5",
+    "csv-parse": "^5.5.3",
+    "dotenv": "^16.4.5",
+    "express": "^4.18.2",
+    "express-session": "^1.18.0",
+    "helmet": "^7.1.0",
+    "knex": "^3.1.0",
+    "morgan": "^1.10.0",
+    "node-cron": "^3.0.3",
+    "pg": "^8.13.0",
+    "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

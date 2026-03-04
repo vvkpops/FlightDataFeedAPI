@@ -90,8 +90,9 @@ async function start() {
     process.exit(1);
   }
 
-  app.listen(PORT, async () => {
-    console.log(`Flight Data API running on port ${PORT}`);
+  const HOST = '0.0.0.0';
+  app.listen(PORT, HOST, async () => {
+    console.log(`Flight Data API running on ${HOST}:${PORT}`);
     console.log(`Admin panel: http://localhost:${PORT}/admin/`);
     console.log(`API base:    http://localhost:${PORT}/api/v1/`);
 

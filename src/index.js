@@ -72,24 +72,45 @@ app.get('/', (req, res) => {
 // ---------------------------------------------------------------------------
 // Start
 // ---------------------------------------------------------------------------
-app.listen(PORT, async () => {
-  console.log(`Flight Data API running on port ${PORT}`);
-  console.log(`Admin panel: http://localhost:${PORT}/admin/`);
-  console.log(`API base:    http://localhost:${PORT}/api/v1/`);
+const db = require('./config/db');
 
-  // Start the daily generation scheduler
-  startScheduler();
-
-  // Generate today's data on startup if it doesn't exist
+async function start() {
+  // Run pending migrations automatically (safe for Railway deploys)
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    const result = await generateAndStore(today);
-    if (!result.skipped) {
-      console.log(`[Startup] Generated ${result.inserted} flights for ${today}`);
+    const [batch, migrations] = await db.migrate.latest({
+      directory: require('path').join(__dirname, 'migrations'),
+    });
+    if (migrations.length) {
+      console.log(`[Migrate] Ran batch ${batch}: ${migrations.join(', ')}`);
+    } else {
+      console.log('[Migrate] Already up to date.');
     }
   } catch (err) {
-    console.error('[Startup] Error generating today\'s data:', err);
+    console.error('[Migrate] Migration failed:', err);
+    process.exit(1);
   }
-});
+
+  app.listen(PORT, async () => {
+    console.log(`Flight Data API running on port ${PORT}`);
+    console.log(`Admin panel: http://localhost:${PORT}/admin/`);
+    console.log(`API base:    http://localhost:${PORT}/api/v1/`);
+
+    // Start the daily generation scheduler
+    startScheduler();
+
+    // Generate today's data on startup if it doesn't exist
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const result = await generateAndStore(today);
+      if (!result.skipped) {
+        console.log(`[Startup] Generated ${result.inserted} flights for ${today}`);
+      }
+    } catch (err) {
+      console.error('[Startup] Error generating today\'s data:', err);
+    }
+  });
+}
+
+start();
 
 module.exports = app;

@@ -183,8 +183,10 @@ function generateFlightsForDate(dateStr, count = 36) {
     const etaDate = addMinutes(arrDate, etaJitter);
 
     // Alternate ETA: compute as if diverting from arrival area to alternate
+    // Clamp extra time to 30-90 minutes so alteta is always meaningfully later than eta
     const altKm = haversineKm(AIRPORTS[arr], AIRPORTS[alt]);
-    const altExtraMin = Math.round(altKm / (450 / 60));
+    const altExtraMinRaw = Math.round(altKm / (450 / 60));
+    const altExtraMin = Math.max(30, Math.min(90, altExtraMinRaw + randInt(0, 15)));
     const altEtaDate = addMinutes(etaDate, altExtraMin);
 
     flights.push({

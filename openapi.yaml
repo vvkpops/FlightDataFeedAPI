@@ -1,0 +1,1067 @@
+openapi: 3.0.3
+info:
+  title: Flight Data API
+  description: |
+    REST API for accessing and managing simulated airline flight data.
+    Flight data is auto-generated daily at 00:05 UTC (configurable via `GENERATE_HOUR` / `GENERATE_MINUTE` env vars).
+    
+    ## Authentication
+    
+    **Public API** endpoints require a valid API key passed via the `x-api-key` header.  
+    **Admin API** endpoints require an authenticated admin session (cookie-based).
+  version: 1.0.0
+  contact:
+    name: Flight Data API Support
+
+servers:
+  - url: /
+    description: Current host
+
+tags:
+  - name: Flights
+    description: Public flight data endpoints (API key required)
+  - name: Statistics
+    description: Public statistics endpoints (API key required)
+  - name: Admin - Auth
+    description: Admin authentication
+  - name: Admin - Dashboard
+    description: Admin dashboard data
+  - name: Admin - Flights
+    description: Admin flight management (CRUD)
+  - name: Admin - Generation
+    description: Data generation management
+  - name: Admin - API Keys
+    description: API key management
+
+# ---------------------------------------------------------------------------
+# Security Schemes
+# ---------------------------------------------------------------------------
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+      description: API key prefixed with `fda_`. Obtain from admin panel.
+    AdminSession:
+      type: apiKey
+      in: cookie
+      name: connect.sid
+      description: Session cookie set after successful admin login.
+
+  # -------------------------------------------------------------------------
+  # Reusable Schemas
+  # -------------------------------------------------------------------------
+  schemas:
+    Flight:
+      type: object
+      properties:
+        id:
+          type: integer
+          description: Auto-increment primary key
+          example: 1
+        callsign:
+          type: string
+          description: Flight callsign
+          example: PVL910
+        actype:
+          type: string
+          description: ICAO aircraft type designator
+          example: B77E
+        acregistration:
+          type: string
+          description: Aircraft registration
+          example: C-GMXE
+        departureicao:
+          type: string
+          description: Departure airport ICAO code
+          example: CYUL
+        arrivalicao:
+          type: string
+          description: Arrival airport ICAO code
+          example: CYQB
+        alternateicao:
+          type: string
+          description: Alternate/diversion airport ICAO code
+          example: CYMX
+        departuretime:
+          type: string
+          format: date-time
+          description: Scheduled departure time (UTC)
+          example: "2026-03-04T08:15:00.000Z"
+        arrivaltime:
+          type: string
+          format: date-time
+          description: Scheduled arrival time (UTC)
+          example: "2026-03-04T09:45:00.000Z"
+        eta:
+          type: string
+          format: date-time
+          description: Estimated time of arrival (UTC)
+          example: "2026-03-04T09:52:00.000Z"
+        alteta:
+          type: string
+          format: date-time
+          description: ETA to alternate airport (UTC)
+          example: "2026-03-04T09:55:00.000Z"
+        generation_date:
+          type: string
+          format: date
+          description: The date this record was generated for
+          example: "2026-03-04"
+        created_at:
+          type: string
+          format: date-time
+          description: Record creation timestamp
+          example: "2026-03-04T00:05:00.000Z"
+        updated_at:
+          type: string
+          format: date-time
+          description: Record last-update timestamp
+          example: "2026-03-04T00:05:00.000Z"
+
+    Pagination:
+      type: object
+      properties:
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 50
+        total:
+          type: integer
+          example: 252
+        pages:
+          type: integer
+          example: 6
+
+    GenerationLogEntry:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        generation_date:
+          type: string
+          format: date
+          example: "2026-03-04"
+        flights_count:
+          type: integer
+          example: 36
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-04T00:05:00.000Z"
+
+    ApiKey:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: My Application
+        key:
+          type: string
+          example: fda_a1b2c3d4e5f6...
+        is_active:
+          type: boolean
+          example: true
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: "2026-03-04T12:30:00.000Z"
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-03-01T10:00:00.000Z"
+
+    Error:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+          example: Description of the error
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+
+  # -------------------------------------------------------------------------
+  # Reusable Parameters
+  # -------------------------------------------------------------------------
+  parameters:
+    FlightId:
+      name: id
+      in: path
+      required: true
+      description: Flight ID
+      schema:
+        type: integer
+    ApiKeyId:
+      name: id
+      in: path
+      required: true
+      description: API key ID
+      schema:
+        type: integer
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+paths:
+  # ========================================================================
+  # PUBLIC API — Flights
+  # ========================================================================
+  /api/v1/flights:
+    get:
+      tags: [Flights]
+      summary: List flights
+      description: Retrieve paginated flight data with optional filters.
+      operationId: getFlights
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - name: date
+          in: query
+          description: Filter by generation date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+        - name: from_date
+          in: query
+          description: Start of date range (inclusive)
+          schema:
+            type: string
+            format: date
+        - name: to_date
+          in: query
+          description: End of date range (inclusive)
+          schema:
+            type: string
+            format: date
+        - name: callsign
+          in: query
+          description: Exact callsign match
+          schema:
+            type: string
+          example: PVL910
+        - name: departure
+          in: query
+          description: Departure ICAO code
+          schema:
+            type: string
+          example: CYUL
+        - name: arrival
+          in: query
+          description: Arrival ICAO code
+          schema:
+            type: string
+          example: CYQB
+        - name: registration
+          in: query
+          description: Aircraft registration
+          schema:
+            type: string
+          example: C-GMXE
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Results per page (max 200)
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Paginated list of flights
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Flight"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          description: Missing x-api-key header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Invalid or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/flights/{id}:
+    get:
+      tags: [Flights]
+      summary: Get flight by ID
+      description: Retrieve a single flight record by its ID.
+      operationId: getFlightById
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - $ref: "#/components/parameters/FlightId"
+      responses:
+        "200":
+          description: Flight details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Flight"
+        "401":
+          description: Missing x-api-key header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Invalid or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Flight not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ========================================================================
+  # PUBLIC API — Dates & Stats
+  # ========================================================================
+  /api/v1/dates:
+    get:
+      tags: [Statistics]
+      summary: List generation dates
+      description: List all dates for which flight data has been generated.
+      operationId: getDates
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: List of generation dates
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        generation_date:
+                          type: string
+                          format: date
+                          example: "2026-03-04"
+                        flights_count:
+                          type: integer
+                          example: 36
+                        created_at:
+                          type: string
+                          format: date-time
+                          example: "2026-03-04T00:05:00.000Z"
+        "401":
+          description: Missing x-api-key header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Invalid or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /api/v1/stats:
+    get:
+      tags: [Statistics]
+      summary: Get summary statistics
+      description: Returns total flights, total days of data, and the latest generation date.
+      operationId: getStats
+      security:
+        - ApiKeyAuth: []
+      responses:
+        "200":
+          description: Summary statistics
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: object
+                    properties:
+                      total_flights:
+                        type: integer
+                        example: 252
+                      total_days:
+                        type: integer
+                        example: 7
+                      latest_generation_date:
+                        type: string
+                        format: date
+                        nullable: true
+                        example: "2026-03-05"
+        "401":
+          description: Missing x-api-key header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "403":
+          description: Invalid or revoked API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ========================================================================
+  # ADMIN API — Auth
+  # ========================================================================
+  /admin/login:
+    post:
+      tags: [Admin - Auth]
+      summary: Admin login
+      description: Authenticate as admin using username and password. Sets a session cookie.
+      operationId: adminLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+                - password
+              properties:
+                username:
+                  type: string
+                  example: admin
+                password:
+                  type: string
+                  format: password
+                  example: secret
+      responses:
+        "200":
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/logout:
+    post:
+      tags: [Admin - Auth]
+      summary: Admin logout
+      description: Destroy the admin session.
+      operationId: adminLogout
+      responses:
+        "200":
+          description: Logout successful
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+
+  /admin/me:
+    get:
+      tags: [Admin - Auth]
+      summary: Check admin session
+      description: Returns whether the current session is authenticated as admin.
+      operationId: adminMe
+      responses:
+        "200":
+          description: Authentication status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  authenticated:
+                    type: boolean
+
+  # ========================================================================
+  # ADMIN API — Dashboard
+  # ========================================================================
+  /admin/dashboard:
+    get:
+      tags: [Admin - Dashboard]
+      summary: Get dashboard data
+      description: Returns summary statistics, latest generation info, and recent flights.
+      operationId: adminDashboard
+      security:
+        - AdminSession: []
+      responses:
+        "200":
+          description: Dashboard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  total_flights:
+                    type: integer
+                    example: 252
+                  total_days:
+                    type: integer
+                    example: 7
+                  total_keys:
+                    type: integer
+                    example: 3
+                  active_keys:
+                    type: integer
+                    example: 2
+                  latest_generation:
+                    $ref: "#/components/schemas/GenerationLogEntry"
+                  recent_flights:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Flight"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ========================================================================
+  # ADMIN API — Flights CRUD
+  # ========================================================================
+  /admin/flights:
+    get:
+      tags: [Admin - Flights]
+      summary: List flights (admin)
+      description: Paginated flight list with optional filters. Callsign uses partial (ILIKE) matching.
+      operationId: adminGetFlights
+      security:
+        - AdminSession: []
+      parameters:
+        - name: date
+          in: query
+          description: Filter by generation date
+          schema:
+            type: string
+            format: date
+        - name: callsign
+          in: query
+          description: Partial callsign match (case-insensitive)
+          schema:
+            type: string
+        - name: departure
+          in: query
+          description: Departure ICAO code
+          schema:
+            type: string
+        - name: arrival
+          in: query
+          description: Arrival ICAO code
+          schema:
+            type: string
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Paginated list of flights
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Flight"
+                  pagination:
+                    $ref: "#/components/schemas/Pagination"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/flights/{id}:
+    get:
+      tags: [Admin - Flights]
+      summary: Get flight by ID (admin)
+      operationId: adminGetFlightById
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/FlightId"
+      responses:
+        "200":
+          description: Flight details
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Flight"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Flight not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    put:
+      tags: [Admin - Flights]
+      summary: Update a flight
+      description: Update one or more fields on an existing flight record.
+      operationId: adminUpdateFlight
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/FlightId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                callsign:
+                  type: string
+                  example: PVL910
+                actype:
+                  type: string
+                  example: B77E
+                acregistration:
+                  type: string
+                  example: C-GMXE
+                departureicao:
+                  type: string
+                  example: CYUL
+                arrivalicao:
+                  type: string
+                  example: CYQB
+                alternateicao:
+                  type: string
+                  example: CYMX
+                departuretime:
+                  type: string
+                  format: date-time
+                arrivaltime:
+                  type: string
+                  format: date-time
+                eta:
+                  type: string
+                  format: date-time
+                alteta:
+                  type: string
+                  format: date-time
+      responses:
+        "200":
+          description: Updated flight
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Flight"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Flight not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags: [Admin - Flights]
+      summary: Delete a flight
+      operationId: adminDeleteFlight
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/FlightId"
+      responses:
+        "200":
+          description: Flight deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: Flight not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ========================================================================
+  # ADMIN API — Generation
+  # ========================================================================
+  /admin/generation-log:
+    get:
+      tags: [Admin - Generation]
+      summary: Get generation log
+      description: Returns the last 60 generation log entries ordered by date descending.
+      operationId: adminGetGenerationLog
+      security:
+        - AdminSession: []
+      responses:
+        "200":
+          description: Generation log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/GenerationLogEntry"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/generate:
+    post:
+      tags: [Admin - Generation]
+      summary: Trigger data generation
+      description: Manually generate flight data for a specific date.
+      operationId: adminGenerate
+      security:
+        - AdminSession: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                date:
+                  type: string
+                  format: date
+                  description: Date to generate data for (defaults to today)
+                  example: "2026-03-04"
+                count:
+                  type: integer
+                  description: Number of flights to generate (uses default if omitted)
+                  example: 36
+      responses:
+        "200":
+          description: Generation result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  generation_date:
+                    type: string
+                    format: date
+                  flights_count:
+                    type: integer
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  # ========================================================================
+  # ADMIN API — API Keys
+  # ========================================================================
+  /admin/api-keys:
+    get:
+      tags: [Admin - API Keys]
+      summary: List API keys
+      description: Returns all API keys with metadata (key value included).
+      operationId: adminGetApiKeys
+      security:
+        - AdminSession: []
+      responses:
+        "200":
+          description: List of API keys
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ApiKey"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    post:
+      tags: [Admin - API Keys]
+      summary: Create an API key
+      description: Generate a new API key with the given name.
+      operationId: adminCreateApiKey
+      security:
+        - AdminSession: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+              properties:
+                name:
+                  type: string
+                  description: A descriptive label for the key
+                  example: My Application
+      responses:
+        "201":
+          description: API key created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ApiKey"
+        "400":
+          description: Validation error (name is required)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+  /admin/api-keys/{id}:
+    put:
+      tags: [Admin - API Keys]
+      summary: Update an API key
+      description: Update the name or active status of an API key.
+      operationId: adminUpdateApiKey
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/ApiKeyId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                  example: Renamed Key
+                is_active:
+                  type: boolean
+                  example: false
+      responses:
+        "200":
+          description: Updated API key
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ApiKey"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: API key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+
+    delete:
+      tags: [Admin - API Keys]
+      summary: Delete an API key
+      operationId: adminDeleteApiKey
+      security:
+        - AdminSession: []
+      parameters:
+        - $ref: "#/components/parameters/ApiKeyId"
+      responses:
+        "200":
+          description: API key deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          description: Not authenticated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "404":
+          description: API key not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"

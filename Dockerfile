@@ -7,6 +7,7 @@ RUN npm install --production
 
 COPY . .
 
-EXPOSE 3001
+# Railway injects PORT at runtime; EXPOSE is informational only
+EXPOSE ${PORT:-3000}
 
 CMD ["node", "src/index.js"]

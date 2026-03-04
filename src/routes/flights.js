@@ -39,7 +39,7 @@ router.get('/flights', async (req, res) => {
     if (registration) query = query.where('acregistration', registration.toUpperCase());
 
     // Count total
-    const [{ count }] = await query.clone().count('id as count');
+    const [{ count }] = await query.clone().clearSelect().count('id as count');
     const total = parseInt(count, 10);
 
     // Fetch page

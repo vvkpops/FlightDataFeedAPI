@@ -14,8 +14,10 @@ info:
     name: Flight Data API Support
 
 servers:
-  - url: /
-    description: Current host
+  - url: https://fdfeedapi.up.railway.app
+    description: Production (Railway)
+  - url: http://localhost:3001
+    description: Local development
 
 tags:
   - name: Flights
